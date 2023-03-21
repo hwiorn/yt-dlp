@@ -134,7 +134,8 @@ class UdemyIE(InfoExtractor):
         if any(p in webpage for p in (
                 '>Please verify you are a human',
                 'Access to this page has been denied because we believe you are using automation tools to browse the website',
-                '"_pxCaptcha"')):
+                '"_pxCaptcha"',
+                'cf-captcha-container')):
             raise ExtractorError(
                 'Udemy asks you to solve a CAPTCHA. Login with browser, '
                 'solve CAPTCHA, then export cookies and pass cookie file to '
@@ -167,10 +168,15 @@ class UdemyIE(InfoExtractor):
         login_popup = self._download_webpage(
             self._LOGIN_URL, None, 'Downloading login popup')
 
+        with open('/tmp/resp.signin.html', 'w') as f:
+            print(login_popup, file=f)
+
         def is_logged(webpage):
             return any(re.search(p, webpage) for p in (
                 r'href=["\'](?:https://www\.udemy\.com)?/user/logout/',
-                r'>Logout<'))
+                r'>Logout<',
+                r'"is_authenticated":true',
+                fr'"email":"{username}"'))
 
         # already logged in
         if is_logged(login_popup):
@@ -190,6 +196,8 @@ class UdemyIE(InfoExtractor):
                 'Referer': self._ORIGIN_URL,
                 'Origin': self._ORIGIN_URL,
             })
+        with open('/tmp/resp.logined.html', 'w') as f:
+            print(response, file=f)
 
         if not is_logged(response):
             error = self._html_search_regex(
@@ -207,6 +215,8 @@ class UdemyIE(InfoExtractor):
         if not course_id:
             webpage = self._download_webpage(url, lecture_id)
             course_id, _ = self._extract_course_info(webpage, lecture_id)
+        # 디버깅중
+        course_id = "3833504"
 
         try:
             lecture = self._download_lecture(course_id, lecture_id)
@@ -436,12 +446,15 @@ class UdemyCourseIE(UdemyIE):  # XXX: Do not subclass from concrete IE
         self._enroll_course(url, webpage, course_id)
 
         response = self._download_json(
-            'https://www.udemy.com/api-2.0/courses/%s/cached-subscriber-curriculum-items' % course_id,
+            #'https://www.udemy.com/api-2.0/courses/%s/cached-subscriber-curriculum-items' % course_id,
+            'https://www.udemy.com/api-2.0/courses/%s/' % course_id,
             course_id, 'Downloading course curriculum', query={
                 'fields[chapter]': 'title,object_index',
                 'fields[lecture]': 'title,asset',
                 'page_size': '1000',
             })
+        with open('/tmp/xxx_response.json', 'w') as f:
+            print(response, file=f)
 
         entries = []
         chapter, chapter_number = [None] * 2
